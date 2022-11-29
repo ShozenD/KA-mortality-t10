@@ -1,0 +1,13 @@
+"0","# Lead libraries"
+"0","library(readr)"
+"0","library(data.table)"
+"2","data.table 1.14.2 using 1 threads (see ?getDTthreads).  Latest news: r-datatable.com
+"
+"2","**********
+This installation of data.table has not detected OpenMP support. It should still work but in single-threaded mode.
+This is a Mac. Please read https://mac.r-project.org/openmp/. Please engage with Apple and ask them for support. Check r-datatable.com for updates, and our Mac instructions here: https://github.com/Rdatatable/data.table/wiki/Installation. After several years of many reports of installation problems on Mac, it's time to gingerly point out that there have been no similar problems on Windows or Linux.
+**********
+"
+"0","library(ggplot2)"
+"2","Want to understand how all the pieces fit together? Read R for Data Science: https://r4ds.had.co.nz/
+"

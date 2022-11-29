@@ -1,0 +1,5 @@
+"0","# Posterior AMR
+dt.amr <- posterior_amr(fit, dt.camr[CAUSE == ""Alzheimer""])
+"
+"2","Warning: 
+ outdir is not given. Results were not saved."

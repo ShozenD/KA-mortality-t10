@@ -1,0 +1,62 @@
+```{r message=FALSE}
+# Lead libraries
+library(readr)
+library(data.table)
+library(ggplot2)
+```
+
+```{r}
+dt <- as.data.table(read_csv("../data/KA-mortality.csv"))
+```
+
+Visualize population
+```{r}
+ggplot(dt, aes(x = YEAR, y = POPULATION)) + 
+  geom_point(aes(color = SEX), size = 0.7, alpha = 0.4) + 
+  facet_wrap(~AGEGRP, nrow=3) + 
+  theme_bw() + 
+  theme(
+    strip.background = element_blank(),
+    axis.text.x = element_text(size = 8, angle = 45, hjust = 1)
+  )
+```
+
+```{r message=FALSE}
+grid <- expand.grid(SEX = c("F", "M"), AGEGRP = unique(dt$AGEGRP))
+
+loess_fits <- lapply(1:nrow(grid), function(i){
+  d <- dt[SEX == grid$SEX[i] & AGEGRP == grid$AGEGRP[i],]
+  loess(POPULATION ~ YEAR, data = d, span = 0.5)
+})
+
+
+loess_yhat <- lapply(loess_fits, function(x){
+  predict(x, newdata = data.frame(YEAR = seq(2005, 2020, 1/4)))
+})
+
+grid <- expand.grid(YEAR = seq(2005, 2020, 1/4), 
+                    SEX = c("F", "M"), 
+                    AGEGRP = unique(dt$AGEGRP))
+
+grid$POP_SMOOTH <- unlist(loess_yhat)
+grid <- as.data.table(grid)
+
+dt <- merge(grid, dt, by=c("YEAR", "SEX", "AGEGRP"), all.x = TRUE)
+```
+
+```{r}
+ggplot(dt, aes(x = YEAR, y = POPULATION)) + 
+  geom_point(aes(color = SEX), size = 0.7, alpha = 0.4) + 
+  geom_line(aes(y = POP_SMOOTH, color = SEX)) + 
+  facet_wrap(~AGEGRP, nrow=3) + 
+  theme_bw() + 
+  theme(
+    strip.background = element_blank(),
+    axis.text.x = element_text(size = 8, angle = 45, hjust = 1)
+  )
+```
+
+```{r}
+saveRDS(dt, "../data/KA-mortality.rds")
+```
+

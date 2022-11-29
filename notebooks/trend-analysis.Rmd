@@ -1,0 +1,152 @@
+```{r message = FALSE}
+# Load libraries
+library(readr)
+library(stringr)
+library(data.table)
+library(cmdstanr)
+library(ggplot2)
+library(ggsci)
+library(posterior)
+library(bayesplot)
+library(patchwork)
+
+source("~/Stanford/CARE 2022/KA-mortality-t10/R/stan-utility.R")
+source("~/Stanford/CARE 2022/KA-mortality-t10/R/postproc-utility.R")
+
+# Set ggplot theme
+theme_set(theme_bw())
+
+# Load data
+dt <- as.data.table(readRDS("~/Stanford/CARE 2022/KA-mortality-t10/data/KA-mortality.rds"))
+dt.pop <- unique(dt[,.(YEAR, SEX, AGEGRP, POPULATION, POP_SMOOTH, WEIGHT)])
+```
+
+```{r}
+# Preprocessing
+dt <- melt(dt[!is.na(COUNT)], 
+           id.vars = c("YEAR", "SEX", "AGEGRP"), 
+           measure.vars = patterns("COUNT_"),
+           variable.name = "CAUSE", value.name = "COUNT")
+
+dt[is.na(COUNT), COUNT := 0]
+dt[, CAUSE := str_remove(CAUSE, "COUNT_")]
+dt[, CAUSE := str_to_title(CAUSE)]
+
+dt <- merge(dt, dt.pop, by = c("YEAR", "SEX", "AGEGRP"), all.x = TRUE)
+
+age.groups <- c("0-4", "5-9", "10-14", "15-19", 
+                "20-24", "25-29", "30-34", "35-39",
+                "40-44", "45-49", "50-54", "55-59", "60-64",
+                "65-69", "70-74", "75-79", "80-84", "85 +")
+
+dt[, AGEGRP := factor(AGEGRP, levels = age.groups)]
+setkey(dt, YEAR, SEX, AGEGRP)
+```
+
+### Calculate Crude age adjusted mortality rates
+```{r}
+# camr = crude age-adjusted mortality rates
+dt.camr <- dt[!is.na(COUNT), .(AMR = sum(COUNT/POPULATION*WEIGHT) * 100000), by = .(YEAR, SEX, CAUSE)]
+
+ggplot(dt.camr, aes(YEAR, AMR)) + 
+  geom_point(aes(color = SEX), size = 0.7) + 
+  facet_wrap(~CAUSE, scales = "free_y") + 
+  labs(x = "Year", y = "AMR") + 
+  theme(strip.background = element_blank())
+```
+
+```{r}
+dt[, SEX := factor(SEX, levels = c("M", "F"))]
+
+ggplot(dt[CAUSE == 'Diabetes'], aes(YEAR, COUNT / POPULATION * 100000)) + 
+  geom_point(aes(color = SEX), size = 0.7) + 
+  ggsci::scale_color_lancet() + 
+  scale_y_continuous(limits = c(0, NA)) + 
+  facet_wrap(~AGEGRP, scales = "free_y") + 
+  theme(
+    strip.text = element_text(size = 8),
+    strip.background = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    axis.text.y = element_text(size = 8)
+  )
+```
+
+### Fit a Gaussian Process regression via Stan
+Compile Stan model
+```{r}
+model <- cmdstan_model("../stan_models/hsgp-nb-eq.stan", compile = TRUE)
+```
+
+Configure Stan data
+```{r}
+stan_data <- make_stan_data(dt, "Alzheimer")
+```
+
+```{r}
+model_inits <- function(){
+  list(beta0 = -log(mean(dt$POPULATION)) + rnorm(1),
+       z = rnorm(1, 0, 0.1))
+}
+```
+
+```{r message=FALSE}
+fit <- model$sample(data = stan_data, seed=123, 
+                    chains = 4, parallel_chains = 4, 
+                    iter_warmup = 500, 
+                    iter_sampling = 1000,
+                    adapt_delta = 0.9,
+                    max_treedepth = 10,
+                    init = model_inits)
+```
+
+```{r}
+# Diagnostic stats
+dt.dst <- diagnostic_stats(fit)
+
+# Compute LOO
+dt.loo <- summarise_loo(fit, "Alzheimer")
+
+# Posterior predictive checks
+dt.ppc <- ppc(fit, dt[CAUSE == "Alzheimer"])
+
+# Posterior MR
+dt.mr <- posterior_mr(fit, dt[CAUSE == "Alzheimer"])
+
+# Posterior AMR
+dt.amr <- posterior_amr(fit, dt.camr[CAUSE == "Alzheimer"])
+```
+
+### Visualise
+```{r}
+ggplot(dt.mr, aes(YEAR, M)) +
+  geom_line(aes(color = SEX)) + 
+  facet_wrap(~AGEGRP, scales = 'free_y')
+
+ggplot(dt.ppc, aes(YEAR, COUNT / POPULATION * 1e5)) + 
+  geom_point(aes(color = SEX), size = 0.4) + 
+  geom_line(aes(y = M/POPULATION* 1e5, color = SEX)) + 
+  geom_ribbon(aes(ymin = CL/POPULATION* 1e5, ymax = CU/POPULATION* 1e5, fill = SEX), alpha = 0.4) + 
+  facet_wrap(~AGEGRP, scales = "free_y")
+```
+
+### AMR
+```{r}
+ggplot(dt.amr, aes(YEAR, M)) + 
+  geom_point(aes(y = AMR, color = SEX), alpha = 0.4) +
+  geom_line(aes(color = SEX)) + 
+  geom_ribbon(aes(ymin = CL, ymax = CU, fill = SEX), alpha = 0.4) + 
+  ggsci::scale_color_lancet() + 
+  ggsci::scale_fill_lancet() + 
+  scale_x_continuous(expand = c(0,0)) + 
+  scale_y_continuous(limits = c(0,NA)) + 
+  labs(x = "Year", y = "AMR", color = "Sex", fill = "Sex") 
+```
+
+
+
+
+
+
+
+
+
