@@ -39,15 +39,12 @@ cat(paste("========== Running Analysis for:", args$data, "==========\n"))
 
 ##### Configurations #####
 out.path <- file.path(args$out.path, str_remove(args$data, ".rds"))
-out.path.fits <- file.path(out.path, "stan_fits")
-out.path.diagnostics <- file.path(out.path, "diagnostics")
-out.path.results <- file.path(out.path, "results")
 if (!file.exists(out.path)) {
   cat(paste(" Making export directory:", out.path, "\n"))
   dir.create(out.path, recursive = TRUE)
-  dir.create(out.path.fits)
-  dir.create(out.path.diagnostics)
-  dir.create(out.path.results)
+  dir.create(file.path(out.path, "stan_fits"))
+  dir.create(file.path(out.path, "diagnostics"))
+  dir.create(file.path(out.path, "results"))
 }
 
 # Helpers
@@ -106,32 +103,32 @@ for (cause in causes_of_death){ # loop over all causes of deaths
                       max_treedepth = 13,
                       init = model_inits)
   # Save stan model
-  fit$save_object(file = file.path(out.path.fits, paste0(cause, "-", args$model.name, ".rds")))
+  fit$save_object(file = file.path(file.path(out.path, "stan_fits"), paste0(cause, "-", args$model.name, ".rds")))
 
   # Configure output paths
-  out.path.diagnostics.tmp <- file.path(out.path.diagnostics, cause)
-  out.path.results.tmp <- file.path(out.path.results, cause)
-  if(!file.exists(out.path.diagnostics.tmp)){
-    dir.create(out.path.diagnostics.tmp)
+  path.diagnostics <- file.path(out.path, "diagnostics", cause)
+  path.results <- file.path(out.path, "results", cause)
+  if(!file.exists(path.diagnostics)){
+    dir.create(path.diagnostics)
   }
-  if(!file.exists(out.path.results.tmp)){
-    dir.create(out.path.results.tmp)
+  if(!file.exists(path.results)){
+    dir.create(path.results)
   }
 
   # Diagnostic stats
-  dt.dst <- diagnostic_stats(fit, out.path.diagnostics.tmp)
+  dt.dst <- diagnostic_stats(fit, path.diagnostics)
 
   # Compute LOO
-  dt.loo <- summarise_loo(fit, cause, out.path.diagnostics.tmp)
+  dt.loo <- summarise_loo(fit, cause, path.diagnostics)
 
   # Posterior predictive checks
-  dt.ppc <- ppc(fit, dt[CAUSE == cause], out.path.diagnostics.tmp)
+  dt.ppc <- ppc(fit, dt[CAUSE == cause], path.diagnostics)
 
   # Posterior MR
-  dt.mr <- posterior_mr(fit, dt[CAUSE == cause], out.path.results.tmp)
+  dt.mr <- posterior_mr(fit, dt[CAUSE == cause], path.results)
 
   # Posterior AMR
-  dt.amr <- posterior_amr(fit, dt.camr[CAUSE == cause], out.path.results.tmp)
+  dt.amr <- posterior_amr(fit, dt.camr[CAUSE == cause], path.results)
 }
 
 cat("========== DONE! ==========\n")
