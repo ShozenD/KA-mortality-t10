@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# mail this address
+#$ -M $USER@stanford.edu
+#$ -m bes
+
+#$ -l mem_free=10G
+#$ -l h_rt=08:00:00
+
+#$ module load r
+
+REPO_PATH=~/KA-mortality-t10
+OUT_PATH=~/KA-mortality-t10-output
+
+Rscript $REPO_PATH/script/run-fullproc.R --repo_path $REPO_PATH -d KK-2005-2020.rds --out_path $OUT_PATH
