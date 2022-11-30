@@ -1,19 +1,14 @@
 # Load required libraries
 library(optparse)
-library(readr)
-library(stringr)
-library(data.table)
-library(cmdstanr)
-library(posterior)
 
 option_list <- list(
-  make_option("--seed", type = "integer", default = 0721,
+  make_option("--seed", type = "integer", default = 123,
               help = "Random number seed [default %default]",
               dest = "seed"),
   make_option("--iter_warmup", type = "integer", default = 1000,
               help = "HMC warmup iterations [default %default]",
               dest = 'iter.warmup'),
-  make_option("--iter_sampling", type = "integer", default = 2000,
+  make_option("--iter_sampling", type = "integer", default = 2500,
               help = "HMC of sampling iterations iterations [default %default]",
               dest = 'iter.sampling'),
   make_option("--n_chains", type = "integer", default = 4,
@@ -34,6 +29,14 @@ option_list <- list(
 )
 
 args <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
+
+renv::activate(args$repo.path)
+
+library(readr)
+library(stringr)
+library(data.table)
+library(cmdstanr)
+library(posterior)
 
 cat(paste("========== Running Analysis for:", args$data, "==========\n"))
 
@@ -80,12 +83,15 @@ dt.camr <- dt[!is.na(COUNT), .(AMR = sum(COUNT/POPULATION*WEIGHT) * 100000),
               by = .(YEAR, SEX, CAUSE)]
 
 ##### Compile and run Stan models #####
-model <- cmdstan_model(file.path(args$repo.path, "stan_models", args$model), compile = TRUE)
+model <- cmdstan_model(file.path(args$repo.path, "stan_models", args$model), force_recompile = TRUE)
 
 model_inits <- function(){
   list(beta0 = -log(mean(dt$POPULATION)) + rnorm(1),
-       z = rnorm(1, 0, 0.1))
+       z = rnorm(1, 0, 0.1),
+       theta = 0.4 + rnorm(1, 0, 0.001))
 }
+
+print(model_inits())
 
 causes_of_death <- unique(dt$CAUSE)
 for (cause in causes_of_death){ # loop over all causes of deaths
@@ -132,5 +138,4 @@ for (cause in causes_of_death){ # loop over all causes of deaths
 }
 
 cat("========== DONE! ==========\n")
-
 

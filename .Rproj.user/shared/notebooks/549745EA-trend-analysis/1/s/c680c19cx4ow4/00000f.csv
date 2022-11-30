@@ -1,4 +1,0 @@
-"0","model_inits <- function(){"
-"0","  list(beta0 = -log(mean(dt$POPULATION)) + rnorm(1),"
-"0","       z = rnorm(1, 0, 0.1))"
-"0","}"

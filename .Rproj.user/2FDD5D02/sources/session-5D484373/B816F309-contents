@@ -17,6 +17,7 @@ source("~/Stanford/CARE 2022/KA-mortality-t10/R/postproc-utility.R")
 theme_set(theme_bw())
 
 # Load data
+dt <- `KK-2005-2020`
 dt <- as.data.table(readRDS("~/Stanford/CARE 2022/KA-mortality-t10/data/KA-mortality.rds"))
 dt.pop <- unique(dt[,.(YEAR, SEX, AGEGRP, POPULATION, POP_SMOOTH, WEIGHT)])
 ```
@@ -58,7 +59,7 @@ ggplot(dt.camr, aes(YEAR, AMR)) +
 ```{r}
 dt[, SEX := factor(SEX, levels = c("M", "F"))]
 
-ggplot(dt[CAUSE == 'Diabetes'], aes(YEAR, COUNT / POPULATION * 100000)) + 
+ggplot(dt[CAUSE == 'Accidents'], aes(YEAR, COUNT / POPULATION * 100000)) + 
   geom_point(aes(color = SEX), size = 0.7) + 
   ggsci::scale_color_lancet() + 
   scale_y_continuous(limits = c(0, NA)) + 
@@ -79,21 +80,22 @@ model <- cmdstan_model("../stan_models/hsgp-nb-eq.stan", compile = TRUE)
 
 Configure Stan data
 ```{r}
-stan_data <- make_stan_data(dt, "Alzheimer")
+stan_data <- make_stan_data(dt, "Accidents")
 ```
 
 ```{r}
 model_inits <- function(){
   list(beta0 = -log(mean(dt$POPULATION)) + rnorm(1),
-       z = rnorm(1, 0, 0.1))
+       z = rnorm(1, 0, 0.01),
+       theta = 0.4 + rnorm(1,0,0.001))
 }
 ```
 
-```{r message=FALSE}
+```{r message=TRUE}
 fit <- model$sample(data = stan_data, seed=123, 
-                    chains = 4, parallel_chains = 4, 
-                    iter_warmup = 500, 
-                    iter_sampling = 1000,
+                    chains = 1, parallel_chains = 1, 
+                    iter_warmup = 100, 
+                    iter_sampling = 50,
                     adapt_delta = 0.9,
                     max_treedepth = 10,
                     init = model_inits)

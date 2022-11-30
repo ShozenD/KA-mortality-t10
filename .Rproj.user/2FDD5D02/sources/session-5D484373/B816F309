@@ -3,7 +3,7 @@
     "path": "~/Stanford/CARE 2022/KA-mortality-t10/notebooks/trend-analysis.Rmd",
     "project_path": "notebooks/trend-analysis.Rmd",
     "type": "r_markdown",
-    "hash": "3658270247",
+    "hash": "2146349155",
     "contents": "",
     "dirty": false,
     "created": 1669515232273.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "98,39",
-        "scrollLine": "88"
+        "cursorPosition": "91,3",
+        "scrollLine": "81"
     },
     "folds": "",
-    "lastKnownWriteTime": 1669697842,
+    "lastKnownWriteTime": 1669788110,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1669697842224,
+    "last_content_update": 1669809731476,
     "read_only": false,
     "read_only_alternatives": []
 }

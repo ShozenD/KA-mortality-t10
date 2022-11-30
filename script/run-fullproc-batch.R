@@ -25,7 +25,10 @@ option_list <- list(
               dest = 'repo.path'),
   make_option("--out_path", type = "character", default = NA,
               help = "Path to the output directory",
-              dest = "out.path")
+              dest = "out.path"),
+  make_option(c("-i", "batch_idx"), type = "integer", default = 1,
+              help = "batch index for batch jobs",
+              dest = "batch.idx")
 )
 
 args <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
@@ -83,7 +86,7 @@ dt.camr <- dt[!is.na(COUNT), .(AMR = sum(COUNT/POPULATION*WEIGHT) * 100000),
               by = .(YEAR, SEX, CAUSE)]
 
 ##### Compile and run Stan models #####
-model <- cmdstan_model(file.path(args$repo.path, "stan_models", args$model), force_recompile = TRUE)
+model <- cmdstan_model(file.path(args$repo.path, "stan_models", args$model), compile = TRUE)
 
 model_inits <- function(){
   list(beta0 = -log(mean(dt$POPULATION)) + rnorm(1),
@@ -91,51 +94,52 @@ model_inits <- function(){
        theta = 0.4 + rnorm(1, 0, 0.001))
 }
 
-print(model_inits())
-
 causes_of_death <- unique(dt$CAUSE)
-for (cause in causes_of_death){ # loop over all causes of deaths
-  cat(paste("Running Stan model for:", cause, "\n"))
+cause <- causes_of_death[args$batch.idx]
+cat(paste(" Running Stan model for:", cause, "\n"))
 
-  stan_data <- make_stan_data(dt, cause)
+stan_data <- make_stan_data(dt, cause)
 
-  fit <- model$sample(data = stan_data,
-                      seed = args$seed,
-                      chains = args$n.chains,
-                      parallel_chains = args$n.chains,
-                      iter_warmup = args$iter.warmup,
-                      iter_sampling = args$iter.sampling,
-                      adapt_delta = 0.9,
-                      max_treedepth = 13,
-                      init = model_inits)
-  # Save stan model
-  fit$save_object(file = file.path(file.path(out.path, "stan_fits"), paste0(cause, "-", args$model.name, ".rds")))
+fit <- model$sample(data = stan_data,
+                    seed = args$seed,
+                    chains = args$n.chains,
+                    parallel_chains = args$n.chains,
+                    iter_warmup = args$iter.warmup,
+                    iter_sampling = args$iter.sampling,
+                    adapt_delta = 0.9,
+                    max_treedepth = 13,
+                    show_messages = FALSE,
+                    init = model_inits)
 
-  # Configure output paths
-  path.diagnostics <- file.path(out.path, "diagnostics", cause)
-  path.results <- file.path(out.path, "results", cause)
-  if(!file.exists(path.diagnostics)){
-    dir.create(path.diagnostics)
-  }
-  if(!file.exists(path.results)){
-    dir.create(path.results)
-  }
+cat(" Saving the fitted model\n")
+# Save stan model
+fit$save_object(file = file.path(file.path(out.path, "stan_fits"), paste0(cause, "-", args$model.name, ".rds")))
 
-  # Diagnostic stats
-  dt.dst <- diagnostic_stats(fit, path.diagnostics)
-
-  # Compute LOO
-  dt.loo <- summarise_loo(fit, cause, path.diagnostics)
-
-  # Posterior predictive checks
-  dt.ppc <- ppc(fit, dt[CAUSE == cause], path.diagnostics)
-
-  # Posterior MR
-  dt.mr <- posterior_mr(fit, dt[CAUSE == cause], path.results)
-
-  # Posterior AMR
-  dt.amr <- posterior_amr(fit, dt.camr[CAUSE == cause], path.results)
+cat(" Saving the results\n")
+# Configure output paths
+path.diagnostics <- file.path(out.path, "diagnostics", cause)
+path.results <- file.path(out.path, "results", cause)
+if(!file.exists(path.diagnostics)){
+  dir.create(path.diagnostics)
 }
+if(!file.exists(path.results)){
+  dir.create(path.results)
+}
+
+# Diagnostic stats
+dt.dst <- diagnostic_stats(fit, path.diagnostics)
+
+# Compute LOO
+dt.loo <- summarise_loo(fit, cause, path.diagnostics)
+
+# Posterior predictive checks
+dt.ppc <- ppc(fit, dt[CAUSE == cause], path.diagnostics)
+
+# Posterior MR
+dt.mr <- posterior_mr(fit, dt[CAUSE == cause], path.results)
+
+# Posterior AMR
+dt.amr <- posterior_amr(fit, dt.camr[CAUSE == cause], path.results)
 
 cat("========== DONE! ==========\n")
 
