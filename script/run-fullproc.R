@@ -35,6 +35,8 @@ option_list <- list(
 
 args <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
 
+args$data <- "KK-2005-2020.rds"
+
 cat(paste("========== Running Analysis for:", args$data, "==========\n"))
 
 ##### Configurations #####
@@ -132,5 +134,4 @@ for (cause in causes_of_death){ # loop over all causes of deaths
 }
 
 cat("========== DONE! ==========\n")
-
 
